@@ -8,14 +8,15 @@
 #define MAX 100
 #define SUPPLIER_NUM 5
 #define CONSUMER_NUM 8
-//int supplier_num = 5;
+char day_name[7][5] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+char month_name[12][5] = {"Jan","Feb","Mar","Apr","May","June","July","Aug","Sep","Oct","Nov","Dec"};
+
 pthread_t suppliers_t[SUPPLIER_NUM];
 int supplier_num[SUPPLIER_NUM];
 char supplier_names[SUPPLIER_NUM][256];
 int supplier_interval[SUPPLIER_NUM];
 int supplier_repeat[SUPPLIER_NUM];
 
-//int consumer_num = 8;
 pthread_t consumers_t[CONSUMER_NUM];
 int consumer_num[CONSUMER_NUM];
 char consumer_names[CONSUMER_NUM][256];
@@ -24,6 +25,8 @@ int consumer_repeat[CONSUMER_NUM];
 
 int item_counters[SUPPLIER_NUM];
 int consumedItem_num[CONSUMER_NUM];
+
+pthread_mutex_t mutex[SUPPLIER_NUM] = PTHREAD_MUTEX_INITIALIZER;
 
 void config_sup(int num){
 	FILE* fp;
@@ -57,6 +60,8 @@ void* addUnits(void *arg)
 	int num = *(int*)arg;
 	int count_wait = 0; //for repeat
 	int interval = supplier_interval[num];
+
+
 	time_t rawtime;
 	struct tm * timeinfo;
 
@@ -64,15 +69,16 @@ void* addUnits(void *arg)
 		interval = 60;
 	}
 
-	//sleep(interval);
 	while(1) {
-		
+
+		pthread_mutex_lock(&mutex[num]);		
+
 		char *output = malloc(100);
 		
 		time ( &rawtime );
 		timeinfo = localtime ( &rawtime );
 
-		sprintf(output, "[%d %d %d %02d:%02d:%02d]",timeinfo->tm_mday, timeinfo->tm_mon + 1, timeinfo->tm_year + 1900, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+		sprintf(output, "[%s %s %d %02d:%02d:%02d %d]",day_name[timeinfo->tm_wday],month_name[timeinfo->tm_mon],timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec ,timeinfo->tm_year+1900);
 		printf("\033[0m");		
 		printf("%s\n", output);
 		
@@ -88,7 +94,7 @@ void* addUnits(void *arg)
 
 			count_wait = 0;
 
-			printf("Remaining items #%d: %d\n\n", num, item_counters[num]);
+			printf("Remaining items %s: %d\n\n", supplier_names[num], item_counters[num]);
 		}
 		else {
 			printf("\033[0;32m");
@@ -105,6 +111,8 @@ void* addUnits(void *arg)
 				printf("%s supplier going to wait %d sec (%d/%d)\n\n", supplier_names[num], interval, count_wait, supplier_repeat[num]);
 			}
 		}
+
+		pthread_mutex_unlock(&mutex[num]);
 		sleep(interval);
 		free(output);
 	}
@@ -117,18 +125,27 @@ void* removeUnits(void *arg)
 	unsigned long i = 0;
 	int num = *(int*)arg;
 	int count_wait = 0; //for repeat
-	int r;
 	int interval = consumer_interval[num];
+
+	time_t rawtime;
+	struct tm * timeinfo;
 
 	if(interval > 60) {
 		interval = 60;
 	}
 
-	//sleep(interval);
 	while(1) {
 
-		r = rand() % SUPPLIER_NUM;
+		pthread_mutex_lock( &mutex[consumedItem_num[num]] );
+		
+		char *output = malloc(100);
+		
+		time ( &rawtime );
+		timeinfo = localtime ( &rawtime );
 
+		sprintf(output, "[%s %s %d %02d:%02d:%02d %d]",day_name[timeinfo->tm_wday],month_name[timeinfo->tm_mon],timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec ,timeinfo->tm_year+1900);
+		printf("\033[0m");		
+		printf("%s\n", output);
 		if(item_counters[consumedItem_num[num]] > 0) {
 			printf("\033[1;31m");
 			printf("%s consumed 1 unit. stock after = %d\n", supplier_names[consumedItem_num[num]], interval);	
@@ -141,7 +158,7 @@ void* removeUnits(void *arg)
 
 			count_wait = 0;
 	
-			printf("Remaining items #%d: %d\n\n", consumedItem_num[num], item_counters[consumedItem_num[num]]);
+			printf("Remaining items %s: %d\n\n", supplier_names[consumedItem_num[num]], item_counters[consumedItem_num[num]]);
 		}
 		else {
 			printf("\033[0;31m");
@@ -158,6 +175,7 @@ void* removeUnits(void *arg)
 				printf("%s consumer going to wait %d sec (%d/%d)\n\n", supplier_names[consumedItem_num[num]], interval, count_wait, consumer_repeat[num]);
 			}
 		}
+		pthread_mutex_unlock( &mutex[consumedItem_num[num]] );
 		sleep(interval);
 	}
 
@@ -178,6 +196,7 @@ int main(void)
 		printf("%d\n", supplier_repeat[i]);
 	}
 	for(int i = 0; i < CONSUMER_NUM; i++){
+		consumer_num[i] = i;
 		for(int j = 0; j < SUPPLIER_NUM; j++) {
 			if(!strcmp(consumer_names[i], supplier_names[j])) {
 				consumedItem_num[i] = j;
@@ -201,7 +220,6 @@ int main(void)
 
 	for(int i = 0; i < CONSUMER_NUM; i++)
 	{
-		consumer_num[i] = i;
 		err = pthread_create(&(consumers_t[i]), NULL, &removeUnits, &consumer_num[i]);
 		if (err != 0)
 			printf("\ncan't create thread :[%s]", strerror(err));
