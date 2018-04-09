@@ -28,6 +28,7 @@ int consumedItem_num[CONSUMER_NUM];
 
 pthread_mutex_t mutex[SUPPLIER_NUM] = PTHREAD_MUTEX_INITIALIZER;
 
+//Read information from supplier configuration file
 void config_sup(int num){
 	FILE* fp;
 	char file_name[50];
@@ -41,6 +42,7 @@ void config_sup(int num){
 		fclose(fp);
 	}
 }
+//Read information from consumer configuration file
 void config_con(int num){
 	FILE* fp;
 	char file_name[50];
@@ -54,37 +56,40 @@ void config_con(int num){
 		fclose(fp);
 	}
 }
+//Add item into vending machine
 void* addUnits(void *arg)
 {
 	unsigned long i = 0;
+	//num is supplier number
 	int num = *(int*)arg;
 	int count_wait = 0; //for repeat
 	int interval = supplier_interval[num];
 
-
+	//Time stamp
 	time_t rawtime;
 	struct tm * timeinfo;
 
+	//Check if interval is over 60
 	if(interval > 60) {
 		interval = 60;
 	}
 
 	while(1) {
 
+		//Permit only one thread to do work once a time
 		pthread_mutex_lock(&mutex[num]);		
 
 		char *output = malloc(100);
-		
+
 		time ( &rawtime );
 		timeinfo = localtime ( &rawtime );
 
-		sprintf(output, "[%s %s %d %02d:%02d:%02d %d]",day_name[timeinfo->tm_wday],month_name[timeinfo->tm_mon],timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec ,timeinfo->tm_year+1900);
-		printf("\033[0m");		
-		printf("%s\n", output);
-		
+		//Print out time and date
+		sprintf(output, "%s %s %d %02d:%02d:%02d %d",day_name[timeinfo->tm_wday],month_name[timeinfo->tm_mon],timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec ,timeinfo->tm_year+1900);
+
+		//If the item is not full, so supplier can add an item
 		if(item_counters[num] < 100) {
-			printf("\033[1;32m");
-			printf("%s supplied 1 unit. Stock after = %d\n", supplier_names[num], interval);	
+			printf("\033[0m%s \033[1;32m%s supplied 1 unit. Stock after = %d\n", output, supplier_names[num], interval);	
 			item_counters[num]++;
 
 			interval = supplier_interval[num];
@@ -94,48 +99,65 @@ void* addUnits(void *arg)
 
 			count_wait = 0;
 
-			printf("Remaining items %s: %d\n\n", supplier_names[num], item_counters[num]);
+			//printf("Remaining items %s: %d\n\n", supplier_names[num], item_counters[num]);
 		}
+
+		//Otherwise supplier has to wait for interval time
 		else {
 			printf("\033[0;32m");
 			count_wait++;
+
+			//If count_wait is equal to repeat value then double up the interval value
 			if(count_wait >= supplier_repeat[num]){
+
 				interval = interval*2;
+	
+				//Check if interval is over 60
 				if(interval > 60) {
 					interval = 60;
 				}
-				printf("%s supplier going to wait %d sec (%d/%d)\n\n", supplier_names[num], interval, count_wait, supplier_repeat[num]);
+
+				printf("\033[0m%s \033[0;32m%s supplier going to wait %d sec (%d/%d)\n", output, supplier_names[num], interval, count_wait, supplier_repeat[num]);
 				count_wait = 0;
 			}
 			else {
-				printf("%s supplier going to wait %d sec (%d/%d)\n\n", supplier_names[num], interval, count_wait, supplier_repeat[num]);
+				printf("\033[0m%s \033[0;32m%s supplier going to wait %d sec (%d/%d)\n", output, supplier_names[num], interval, count_wait, supplier_repeat[num]);
 			}
 		}
 
+		//Unlock and give permission to the others
 		pthread_mutex_unlock(&mutex[num]);
+
+		//Force supplier to wait for interval time
 		sleep(interval);
+
 		free(output);
 	}
 
 	return NULL;
 }
 
+//Remove item from vending machine
 void* removeUnits(void *arg)
 {
 	unsigned long i = 0;
+	//num is consumer number
 	int num = *(int*)arg;
 	int count_wait = 0; //for repeat
 	int interval = consumer_interval[num];
 
+	//Time stamp
 	time_t rawtime;
 	struct tm * timeinfo;
 
+	//Check if interval is over 60
 	if(interval > 60) {
 		interval = 60;
 	}
 
 	while(1) {
-
+		
+		//Permit only one thread to do work once a time
 		pthread_mutex_lock( &mutex[consumedItem_num[num]] );
 		
 		char *output = malloc(100);
@@ -143,12 +165,13 @@ void* removeUnits(void *arg)
 		time ( &rawtime );
 		timeinfo = localtime ( &rawtime );
 
-		sprintf(output, "[%s %s %d %02d:%02d:%02d %d]",day_name[timeinfo->tm_wday],month_name[timeinfo->tm_mon],timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec ,timeinfo->tm_year+1900);
-		printf("\033[0m");		
-		printf("%s\n", output);
+		//Print out time and date
+		sprintf(output, "%s %s %d %02d:%02d:%02d %d",day_name[timeinfo->tm_wday],month_name[timeinfo->tm_mon],timeinfo->tm_mday, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec ,timeinfo->tm_year+1900);	
+
+		//If the item is not empty, so consumer can consume an item
 		if(item_counters[consumedItem_num[num]] > 0) {
-			printf("\033[1;31m");
-			printf("%s consumed 1 unit. stock after = %d\n", supplier_names[consumedItem_num[num]], interval);	
+
+			printf("\033[0m%s \033[1;31m%s(%d) consumed 1 unit. stock after = %d\n",output, supplier_names[consumedItem_num[num]],num, interval);	
 			item_counters[consumedItem_num[num]]--;
 
 			interval = consumer_interval[num];
@@ -158,25 +181,37 @@ void* removeUnits(void *arg)
 
 			count_wait = 0;
 	
-			printf("Remaining items %s: %d\n\n", supplier_names[consumedItem_num[num]], item_counters[consumedItem_num[num]]);
+			//printf("Remaining items %s: %d\n\n", supplier_names[consumedItem_num[num]], item_counters[consumedItem_num[num]]);
 		}
+
+		//Otherwise consumer has to wait for interval time
 		else {
-			printf("\033[0;31m");
 			count_wait++;
+	
+			//If count_wait is equal to repeat value then double up the interval value
 			if(count_wait >= consumer_repeat[num]){
+
 				interval = interval*2;
+
+				//Check if interval is over 60
 				if(interval > 60) {
 					interval = 60;
 				}
-				printf("%s consumer going to wait %d sec (%d/%d)\n\n", supplier_names[consumedItem_num[num]], interval, count_wait, consumer_repeat[num]);
+
+				printf("\033[0m%s \033[0;31m%s(%d) consumer going to wait %d sec (%d/%d)\n",output, supplier_names[consumedItem_num[num]],num, interval, count_wait, consumer_repeat[num]);
 				count_wait = 0;
 			}
 			else {
-				printf("%s consumer going to wait %d sec (%d/%d)\n\n", supplier_names[consumedItem_num[num]], interval, count_wait, consumer_repeat[num]);
+				printf("\033[0m%s \033[0;31m%s(%d) consumer going to wait %d sec (%d/%d)\n",output, supplier_names[consumedItem_num[num]],num, interval, count_wait, consumer_repeat[num]);
 			}
 		}
+
+		//Unlock and give permission to the others
 		pthread_mutex_unlock( &mutex[consumedItem_num[num]] );
+
+		//Force consumer to wait for interval time
 		sleep(interval);
+		free(output);
 	}
 
 	return NULL;
@@ -186,14 +221,14 @@ int main(void)
 {
 	srand(time(NULL));
 	
+	//Read information from 5 supplier configuration files
 	config_sup(SUPPLIER_NUM);
+	//Read information from 8 consumer configuration files
 	config_con(CONSUMER_NUM);
-
+	
+	//Match suppliers and consumers to item number
 	for(int i = 0; i < SUPPLIER_NUM; i++){
 		supplier_num[i] = i;
-		printf("%s\n", supplier_names[i]);
-		printf("%d\n", supplier_interval[i]);
-		printf("%d\n", supplier_repeat[i]);
 	}
 	for(int i = 0; i < CONSUMER_NUM; i++){
 		consumer_num[i] = i;
@@ -202,15 +237,11 @@ int main(void)
 				consumedItem_num[i] = j;
 			}
 		}
-		printf("%s\n", consumer_names[i]);
-		printf("%d\n", consumer_interval[i]);
-		printf("%d\n", consumer_repeat[i]);
 	}
 
 	int err;
-
 	
-
+	//Create supplier threads
 	for(int i = 0; i < SUPPLIER_NUM; i++)
 	{
 		err = pthread_create(&(suppliers_t[i]), NULL, &addUnits, &supplier_num[i]);
@@ -218,6 +249,7 @@ int main(void)
 			printf("\ncan't create thread :[%s]", strerror(err));
 	}
 
+	//Create consumer threads
 	for(int i = 0; i < CONSUMER_NUM; i++)
 	{
 		err = pthread_create(&(consumers_t[i]), NULL, &removeUnits, &consumer_num[i]);
