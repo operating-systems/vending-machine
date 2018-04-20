@@ -89,9 +89,9 @@ void* addUnits(void *arg)
 
 		//If the item is not full, so supplier can add an item
 		if(item_counters[num] < 100) {
-			printf("\033[0m%s \033[1;32m%s supplied 1 unit. Stock after = %d\n", output, supplier_names[num], interval);	
-			item_counters[num]++;
 
+			item_counters[num]++;
+            printf("\033[0m%s \033[1;32m%s supplied 1 unit. Going to wait for %d sec\nRemaining items %s: %d\n\n", output, supplier_names[num], interval, supplier_names[num], item_counters[num]);
 			interval = supplier_interval[num];
 			if(interval > 60) {
 				interval = 60;
@@ -117,11 +117,11 @@ void* addUnits(void *arg)
 					interval = 60;
 				}
 
-				printf("\033[0m%s \033[0;32m%s supplier going to wait %d sec (%d/%d)\n", output, supplier_names[num], interval, count_wait, supplier_repeat[num]);
+				printf("\033[0m%s \033[0;32m%s is full. %s supplier going to wait for %d sec (%d/%d)\n\n", output, supplier_names[num], supplier_names[num], interval, count_wait, supplier_repeat[num]);
 				count_wait = 0;
 			}
 			else {
-				printf("\033[0m%s \033[0;32m%s supplier going to wait %d sec (%d/%d)\n", output, supplier_names[num], interval, count_wait, supplier_repeat[num]);
+				printf("\033[0m%s \033[0;32m%s is full. %s supplier going to wait for %d sec (%d/%d)\n\n", output, supplier_names[num], supplier_names[num], interval, count_wait, supplier_repeat[num]);
 			}
 		}
 
@@ -170,9 +170,9 @@ void* removeUnits(void *arg)
 
 		//If the item is not empty, so consumer can consume an item
 		if(item_counters[consumedItem_num[num]] > 0) {
-
-			printf("\033[0m%s \033[1;31m%s(%d) consumed 1 unit. stock after = %d\n",output, supplier_names[consumedItem_num[num]],num, interval);	
-			item_counters[consumedItem_num[num]]--;
+            item_counters[consumedItem_num[num]]--;
+			printf("\033[0m%s \033[1;31m%s(Thread %d) consumed 1 unit. Going to wait for %d sec\nRemaining items %s: %d\n\n",output, supplier_names[consumedItem_num[num]],num, interval, supplier_names[consumedItem_num[num]], item_counters[consumedItem_num[num]]);
+			
 
 			interval = consumer_interval[num];
 			if(interval > 60) {
@@ -198,11 +198,11 @@ void* removeUnits(void *arg)
 					interval = 60;
 				}
 
-				printf("\033[0m%s \033[0;31m%s(%d) consumer going to wait %d sec (%d/%d)\n",output, supplier_names[consumedItem_num[num]],num, interval, count_wait, consumer_repeat[num]);
+				printf("\033[0m%s \033[0;31m%s is out of order. %s(Thread %d) consumer going to wait for %d sec (%d/%d)\n\n",output, supplier_names[consumedItem_num[num]], supplier_names[consumedItem_num[num]],num, interval, count_wait, consumer_repeat[num]);
 				count_wait = 0;
 			}
 			else {
-				printf("\033[0m%s \033[0;31m%s(%d) consumer going to wait %d sec (%d/%d)\n",output, supplier_names[consumedItem_num[num]],num, interval, count_wait, consumer_repeat[num]);
+				printf("\033[0m%s \033[0;31m%s is out of order. %s(Thread %d) consumer going to wait for %d sec (%d/%d)\n\n",output, supplier_names[consumedItem_num[num]], supplier_names[consumedItem_num[num]],num, interval, count_wait, consumer_repeat[num]);
 			}
 		}
 
